@@ -3,6 +3,9 @@
 
 #include "stdafx.h"
 #include "MiniPaint.h"
+#include <math.h>
+#include <cstdlib>
+#include <ctime>
 
 #define MAX_LOADSTRING 100
 
@@ -128,6 +131,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
+    static	HPEN hPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
 
 	switch (message)
 	{
@@ -149,9 +153,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
-		// TODO: добавьте любой код отрисовки...
 		EndPaint(hWnd, &ps);
 		break;
+	case WM_RBUTTONUP:
+	{
+		HDC hdc = GetDC(hWnd);
+		DeleteObject(hPen);
+		srand((unsigned int)(time(NULL)));
+		hPen = CreatePen(PS_SOLID, 2, RGB(rand() % 256, rand() % 256, rand() % 256));
+		ReleaseDC(hWnd, hdc);
+		break;
+	}
 	case WM_MOUSEMOVE:
 	{
 		static int xold = 0, yold = 0;
@@ -160,6 +172,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (wParam& MK_LBUTTON)
 		{
 			HDC hdc = GetDC(hWnd);
+			SelectObject(hdc, hPen);
 			MoveToEx(hdc, xold, yold, NULL);
 			LineTo(hdc, x, y);
 			ReleaseDC(hWnd, hdc);
