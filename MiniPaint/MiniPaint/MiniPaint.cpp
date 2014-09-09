@@ -131,8 +131,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	HDC hdc;
-    static	HPEN hPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
-
+	static unsigned int lineWidth = 1;
+	static COLORREF lineColor = RGB(0, 0, 0);
+    static	HPEN hPen;
 	switch (message)
 	{
 	case WM_COMMAND:
@@ -155,12 +156,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		hdc = BeginPaint(hWnd, &ps);
 		EndPaint(hWnd, &ps);
 		break;
-	case WM_RBUTTONUP:
+	case WM_RBUTTONDOWN:
 	{
 		HDC hdc = GetDC(hWnd);
 		DeleteObject(hPen);
 		srand((unsigned int)(time(NULL)));
-		hPen = CreatePen(PS_SOLID, 2, RGB(rand() % 256, rand() % 256, rand() % 256));
+		lineColor = RGB(rand() % 256, rand() % 256, rand() % 256);
+		hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
 		ReleaseDC(hWnd, hdc);
 		break;
 	}
@@ -180,7 +182,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		xold = x; yold = y;
 		break;
 	}
-
+	case WM_MOUSEWHEEL:
+	{
+						  HDC hdc = GetDC(hWnd);
+						  int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+						  if (delta > 0)
+						  {
+							  if (wParam & MK_SHIFT)
+								  lineWidth = lineWidth + 3;
+							  else
+								  lineWidth++;
+						  }
+						  else
+						  {
+							  if (lineWidth > 0)
+							  {
+								  if (wParam & MK_SHIFT)
+									  lineWidth = lineWidth - 3;
+								  else
+									  lineWidth--;
+							  }
+						  }
+						  DeleteObject(hPen);
+						  hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
+						  ReleaseDC(hWnd, hdc);
+						  break; }
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
