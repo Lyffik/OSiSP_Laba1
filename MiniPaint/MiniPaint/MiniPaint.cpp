@@ -19,6 +19,12 @@ ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+void ChangeLineWidth(HWND , UINT , WPARAM , LPARAM );
+void ChangeLineColor(HWND, UINT, WPARAM, LPARAM);
+HDC hdc;
+unsigned int lineWidth = 1;
+COLORREF lineColor = RGB(0, 0, 0);
+HPEN hPen;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -28,7 +34,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
- 	// TODO: разместите код здесь.
 	MSG msg;
 	HACCEL hAccelTable;
 
@@ -36,7 +41,7 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadString(hInstance, IDC_MINIPAINT, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
-
+	srand((unsigned int)(time(NULL)));
 	// Выполнить инициализацию приложения:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
@@ -130,10 +135,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
-	HDC hdc;
-	static unsigned int lineWidth = 1;
-	static COLORREF lineColor = RGB(0, 0, 0);
-    static	HPEN hPen;
 	switch (message)
 	{
 	case WM_COMMAND:
@@ -142,6 +143,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// Разобрать выбор в меню:
 		switch (wmId)
 		{
+		case IDM_Line:
+			break;
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
@@ -158,12 +161,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_RBUTTONDOWN:
 	{
-		HDC hdc = GetDC(hWnd);
-		DeleteObject(hPen);
-		srand((unsigned int)(time(NULL)));
-		lineColor = RGB(rand() % 256, rand() % 256, rand() % 256);
-		hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
-		ReleaseDC(hWnd, hdc);
+		ChangeLineColor( hWnd,  message,  wParam,  lParam);
 		break;
 	}
 	case WM_MOUSEMOVE:
@@ -173,7 +171,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		int y = HIWORD(lParam);
 		if (wParam& MK_LBUTTON)
 		{
-			HDC hdc = GetDC(hWnd);
+			hdc = GetDC(hWnd);
 			SelectObject(hdc, hPen);
 			MoveToEx(hdc, xold, yold, NULL);
 			LineTo(hdc, x, y);
@@ -184,29 +182,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	case WM_MOUSEWHEEL:
 	{
-						  HDC hdc = GetDC(hWnd);
-						  int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-						  if (delta > 0)
-						  {
-							  if (wParam & MK_SHIFT)
-								  lineWidth = lineWidth + 3;
-							  else
-								  lineWidth++;
-						  }
-						  else
-						  {
-							  if (lineWidth > 0)
-							  {
-								  if (wParam & MK_SHIFT)
-									  lineWidth = lineWidth - 3;
-								  else
-									  lineWidth--;
-							  }
-						  }
-						  DeleteObject(hPen);
-						  hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
-						  ReleaseDC(hWnd, hdc);
-						  break; }
+		 ChangeLineWidth( hWnd,  message,  wParam,  lParam);
+		 break; 
+	}
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
@@ -214,6 +192,40 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
+}
+
+void ChangeLineColor(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	hdc = GetDC(hWnd);
+	DeleteObject(hPen);
+	lineColor = RGB(rand() % 256, rand() % 256, rand() % 256);
+	hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
+	ReleaseDC(hWnd, hdc);
+}
+void ChangeLineWidth(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	hdc = GetDC(hWnd);
+	int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+	if (delta > 0)
+	{
+		if (wParam & MK_SHIFT)
+			lineWidth = lineWidth + 2;
+		else
+			lineWidth++;
+	}
+	else
+	{
+		if (lineWidth > 1)
+		{
+			if ((wParam & MK_SHIFT) & (lineWidth>3))
+				lineWidth = lineWidth - 2;
+			else
+				lineWidth--;
+		}
+	}
+	DeleteObject(hPen);
+	hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
+	ReleaseDC(hWnd, hdc);
 }
 
 // Обработчик сообщений для окна "О программе".
