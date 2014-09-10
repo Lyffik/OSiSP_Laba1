@@ -19,12 +19,18 @@ ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
+
 void ChangeLineWidth(HWND , UINT , WPARAM , LPARAM );
 void ChangeLineColor(HWND, UINT, WPARAM, LPARAM);
+void DrawPen(HWND, UINT, WPARAM, LPARAM);
+void DrawLine(HWND, UINT, WPARAM, LPARAM);
+
 HDC hdc;
+HDC MemoryHdc;
+HBITMAP MemoryBitmap;
+HPEN hPen;
 unsigned int lineWidth = 1;
 COLORREF lineColor = RGB(0, 0, 0);
-HPEN hPen;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -135,6 +141,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
+	HDC TempHdc;
 	switch (message)
 	{
 	case WM_COMMAND:
@@ -164,20 +171,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		ChangeLineColor( hWnd,  message,  wParam,  lParam);
 		break;
 	}
+	case WM_LBUTTONDOWN:
+	{
+						   DrawLine(hWnd, message, wParam, lParam);
+						   break;
+	}
+	case WM_LBUTTONUP:
+	{
+						 DrawLine(hWnd, message, wParam, lParam);
+						   break;
+	}
 	case WM_MOUSEMOVE:
 	{
-		static int xold = 0, yold = 0;
-		int x = LOWORD(lParam);
-		int y = HIWORD(lParam);
-		if (wParam& MK_LBUTTON)
-		{
-			hdc = GetDC(hWnd);
-			SelectObject(hdc, hPen);
-			MoveToEx(hdc, xold, yold, NULL);
-			LineTo(hdc, x, y);
-			ReleaseDC(hWnd, hdc);
-		}
-		xold = x; yold = y;
+						 DrawLine(hWnd, message, wParam, lParam);
 		break;
 	}
 	case WM_MOUSEWHEEL:
@@ -192,6 +198,69 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
+}
+
+void DrawLine(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	static int x1, x2, y1, y2;
+
+	switch (message)
+	{
+	case WM_LBUTTONDOWN:
+	{
+						   hdc = GetDC(hWnd);
+						   SelectObject(hdc, hPen);
+						   x1 = x2 = LOWORD(lParam);
+						   y1 = y2 = HIWORD(lParam);
+						   MoveToEx(hdc, x1, y1, NULL);
+						   LineTo(hdc, x2, y2);
+						   break;
+	}
+	case WM_LBUTTONUP:
+	{
+						 hdc = GetDC(hWnd);
+						 SelectObject(hdc, hPen);
+						 SetROP2(hdc, R2_COPYPEN);
+						 x2 = LOWORD(lParam);
+						 y2 = HIWORD(lParam);
+						 MoveToEx(hdc, x1, y1, NULL);
+						 LineTo(hdc, x2, y2);
+						 break;
+
+	}
+	case WM_MOUSEMOVE:
+	{ hdc = GetDC(hWnd);
+	SelectObject(hdc, hPen);
+	if (wParam& MK_LBUTTON)
+	{
+		SetROP2(hdc, R2_NOTXORPEN);
+		MoveToEx(hdc, x1, y1, NULL);
+		LineTo(hdc, x2, y2);
+		x2 = LOWORD(lParam);
+		y2 = HIWORD(lParam);
+		MoveToEx(hdc, x1, y1, NULL);
+		LineTo(hdc, x2, y2);
+	}
+	break;
+	}
+	}
+	ReleaseDC(hWnd, hdc);
+}
+
+void DrawPen(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	static int xold = 0, yold = 0;
+	int x = LOWORD(lParam);
+	int y = HIWORD(lParam);
+	if (wParam& MK_LBUTTON)
+	{
+		hdc = GetDC(hWnd);
+		SelectObject(hdc, hPen);
+		MoveToEx(hdc, xold, yold, NULL);
+		LineTo(hdc, x, y);
+		ReleaseDC(hWnd, hdc);
+	}
+	xold = x; yold = y;
 }
 
 void ChangeLineColor(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
