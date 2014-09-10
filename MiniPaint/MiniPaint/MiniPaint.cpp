@@ -6,6 +6,7 @@
 #include <math.h>
 #include <cstdlib>
 #include <ctime>
+#include "commdlg.h"
 
 #define MAX_LOADSTRING 100
 
@@ -150,6 +151,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		// Разобрать выбор в меню:
 		switch (wmId)
 		{
+		case IDM_PENCOLOR:
+		{
+			CHOOSECOLOR color;
+			COLORREF ccref[16];
+			memset(&color, 0, sizeof(color));
+			color.lStructSize = sizeof(CHOOSECOLOR);
+			color.hwndOwner = NULL;
+			color.lpCustColors = ccref;
+			color.rgbResult = lineColor;
+			color.Flags = CC_RGBINIT;
+			if (ChooseColor(&color))
+			{
+				lineColor = color.rgbResult;
+			}
+		}
+			break;
 		case IDM_Line:
 			break;
 		case IDM_ABOUT:
