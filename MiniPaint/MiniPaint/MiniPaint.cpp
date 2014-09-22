@@ -21,17 +21,22 @@ BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
-void ChangeLineWidth(HWND , UINT , WPARAM , LPARAM );
-void ChangeLineColor(HWND, UINT, WPARAM, LPARAM);
+void ChangePenWidth(HWND , UINT , WPARAM , LPARAM );
+void ChangePenColor(HWND, UINT, WPARAM, LPARAM);
 void DrawPen(HWND, UINT, WPARAM, LPARAM);
 void DrawLine(HWND, UINT, WPARAM, LPARAM);
 
 HDC hdc;
-HDC MemoryHdc;
-HBITMAP MemoryBitmap;
-HPEN hPen;
-unsigned int lineWidth = 1;
-COLORREF lineColor = RGB(0, 0, 0);
+HDC memoryHdc;
+HDC drawingHdc;
+HBITMAP memoryBitmap;
+HBITMAP drawBitmap;
+HPEN pen;
+HBRUSH brush;
+BOOL drawing=false;
+
+unsigned int penWidth = 1;
+COLORREF penColor = RGB(0, 0, 0);
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -145,10 +150,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	HDC TempHdc;
 	switch (message)
 	{
+	case WM_CREATE:
+	{
+		RECT rect;
+		hdc = GetDC(hWnd);
+		GetClientRect(hWnd, &rect);
+		
+		pen = (HPEN)GetStockObject(BLACK_PEN);
+		brush = (HBRUSH)GetStockObject(NULL_BRUSH);
+
+		memoryHdc = CreateCompatibleDC(hdc);
+		memoryBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+
+		drawingHdc = CreateCompatibleDC(hdc);
+		drawBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+
+		DeleteObject(SelectObject(drawingHdc, drawBitmap));
+		DeleteObject(SelectObject(drawingHdc, (HBRUSH)WHITE_BRUSH));
+		PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
+
+		DeleteObject(SelectObject(memoryHdc, memoryBitmap));
+		DeleteObject(SelectObject(memoryHdc, (HBRUSH)WHITE_BRUSH));
+		PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
+
+		DeleteObject(SelectObject(drawingHdc, pen));
+		DeleteObject(SelectObject(drawingHdc, brush));
+		DeleteObject(SelectObject(memoryHdc,pen));
+		DeleteObject(SelectObject(memoryHdc, brush));
+
+		break;
+	}
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
-		// Разобрать выбор в меню:
 		switch (wmId)
 		{
 		case IDM_PENCOLOR:
@@ -159,11 +193,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			color.lStructSize = sizeof(CHOOSECOLOR);
 			color.hwndOwner = NULL;
 			color.lpCustColors = ccref;
-			color.rgbResult = lineColor;
+			color.rgbResult = penColor;
 			color.Flags = CC_RGBINIT;
 			if (ChooseColor(&color))
 			{
-				lineColor = color.rgbResult;
+				penColor = color.rgbResult;
 			}
 		}
 			break;
@@ -180,32 +214,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_PAINT:
-		hdc = BeginPaint(hWnd, &ps);
+		TempHdc = BeginPaint(hWnd, &ps);
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_RBUTTONDOWN:
 	{
-		ChangeLineColor( hWnd,  message,  wParam,  lParam);
+		ChangePenColor( hWnd,  message,  wParam,  lParam);
 		break;
 	}
 	case WM_LBUTTONDOWN:
 	{
-						   DrawLine(hWnd, message, wParam, lParam);
+						  
 						   break;
 	}
 	case WM_LBUTTONUP:
 	{
-						 DrawLine(hWnd, message, wParam, lParam);
+						
 						   break;
 	}
 	case WM_MOUSEMOVE:
 	{
-						 DrawLine(hWnd, message, wParam, lParam);
+					
 		break;
 	}
 	case WM_MOUSEWHEEL:
 	{
-		 ChangeLineWidth( hWnd,  message,  wParam,  lParam);
 		 break; 
 	}
 	case WM_DESTROY:
@@ -220,13 +253,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 void DrawLine(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	static int x1, x2, y1, y2;
-
 	switch (message)
 	{
 	case WM_LBUTTONDOWN:
 	{
 						   hdc = GetDC(hWnd);
-						   SelectObject(hdc, hPen);
+						   SelectObject(hdc, pen);
 						   x1 = x2 = LOWORD(lParam);
 						   y1 = y2 = HIWORD(lParam);
 						   MoveToEx(hdc, x1, y1, NULL);
@@ -236,7 +268,7 @@ void DrawLine(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONUP:
 	{
 						 hdc = GetDC(hWnd);
-						 SelectObject(hdc, hPen);
+						 SelectObject(hdc, pen);
 						 SetROP2(hdc, R2_COPYPEN);
 						 x2 = LOWORD(lParam);
 						 y2 = HIWORD(lParam);
@@ -246,33 +278,35 @@ void DrawLine(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 	}
 	case WM_MOUSEMOVE:
-	{ hdc = GetDC(hWnd);
-	SelectObject(hdc, hPen);
-	if (wParam& MK_LBUTTON)
-	{
-		SetROP2(hdc, R2_NOTXORPEN);
-		MoveToEx(hdc, x1, y1, NULL);
-		LineTo(hdc, x2, y2);
-		x2 = LOWORD(lParam);
-		y2 = HIWORD(lParam);
-		MoveToEx(hdc, x1, y1, NULL);
-		LineTo(hdc, x2, y2);
-	}
-	break;
+	{ 
+		hdc = GetDC(hWnd);
+		SelectObject(hdc, pen);
+		if (wParam& MK_LBUTTON)
+		{
+			SetROP2(hdc, R2_NOTXORPEN);
+			MoveToEx(hdc, x1, y1, NULL);
+			LineTo(hdc, x2, y2);
+			x2 = LOWORD(lParam);
+			y2 = HIWORD(lParam);
+			MoveToEx(hdc, x1, y1, NULL);
+			LineTo(hdc, x2, y2);
+		}
+		break;
 	}
 	}
 	ReleaseDC(hWnd, hdc);
 }
 
+
 void DrawPen(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	hdc = GetDC(hWnd);
 	static int xold = 0, yold = 0;
 	int x = LOWORD(lParam);
 	int y = HIWORD(lParam);
 	if (wParam& MK_LBUTTON)
 	{
-		hdc = GetDC(hWnd);
-		SelectObject(hdc, hPen);
+		SelectObject(hdc, pen);
 		MoveToEx(hdc, xold, yold, NULL);
 		LineTo(hdc, x, y);
 		ReleaseDC(hWnd, hdc);
@@ -280,37 +314,37 @@ void DrawPen(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	xold = x; yold = y;
 }
 
-void ChangeLineColor(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+void ChangePenColor(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	hdc = GetDC(hWnd);
-	DeleteObject(hPen);
-	lineColor = RGB(rand() % 256, rand() % 256, rand() % 256);
-	hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
+	DeleteObject(pen);
+	penColor = RGB(rand() % 256, rand() % 256, rand() % 256);
+	pen = CreatePen(PS_SOLID, penWidth, penColor);
 	ReleaseDC(hWnd, hdc);
 }
-void ChangeLineWidth(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+void ChangePenWidth(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	hdc = GetDC(hWnd);
 	int delta = GET_WHEEL_DELTA_WPARAM(wParam);
 	if (delta > 0)
 	{
 		if (wParam & MK_SHIFT)
-			lineWidth = lineWidth + 2;
+			penWidth = penWidth + 2;
 		else
-			lineWidth++;
+			penWidth++;
 	}
 	else
 	{
-		if (lineWidth > 1)
+		if (penWidth > 1)
 		{
-			if ((wParam & MK_SHIFT) & (lineWidth>3))
-				lineWidth = lineWidth - 2;
+			if ((wParam & MK_SHIFT) & (penWidth>3))
+				penWidth = penWidth - 2;
 			else
-				lineWidth--;
+				penWidth--;
 		}
 	}
-	DeleteObject(hPen);
-	hPen = CreatePen(PS_SOLID, lineWidth, lineColor);
+	DeleteObject(pen);
+	pen = CreatePen(PS_SOLID, penWidth, penColor);
 	ReleaseDC(hWnd, hdc);
 }
 
