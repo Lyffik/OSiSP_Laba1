@@ -8,7 +8,9 @@
 #include "commdlg.h"
 #include "Initialization.h"
 #include "Shapes.h"
+#include <string>
 
+typedef std::basic_string<TCHAR, std::char_traits<TCHAR>, std::allocator<TCHAR> > String;
 
 enum Tools { PENCIL, LINE, RECTANGLE, ELLIPSE, POLY,TEXT };
 #define MAX_LOADSTRING 100
@@ -44,6 +46,7 @@ CHOOSECOLOR cc;
 COLORREF acrCustClr[16];
 INT prevX = -1, prevY = -1, startX = -1, startY = -1; 
 BOOL isPolyLine; 
+String str;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -208,6 +211,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			prevY = -1;
 			ToolId = POLY;
 			break;
+		case ID_TEXT:
+			ToolId = TEXT;
+			break;
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
@@ -253,6 +259,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 									   startY = prevY;
 								   }
 								   shape = new Line(prevX, prevY);
+								   break;
+							   case TEXT:
+								   prevX = (short)LOWORD(lParam);
+								   prevY = (short)HIWORD(lParam);
+								   str.clear();
 								   break;
 							   }
 							   drawMode = CURRENT;
@@ -368,6 +379,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						  
 						  break;
 	}
+	case WM_CHAR:
+		if (ToolId == 5)
+		{
+
+			str += (TCHAR)wParam;
+			GetClientRect(hWnd, &rect);
+			TextOut(memoryHdc, prevX, prevY, str.data(), str.size());
+			drawMode = BUFFER;
+			InvalidateRect(hWnd, NULL, FALSE);
+		}
+		break;
 	case WM_DESTROY:
 		ReleaseDC(hWnd, hdc);
 		PostQuitMessage(0);

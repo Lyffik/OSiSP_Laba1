@@ -12,3 +12,4 @@
 		HBITMAP &memoryBitmap);
 
 	enum draw { CURRENT, BUFFER, PEN };
+
