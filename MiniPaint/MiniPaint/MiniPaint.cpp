@@ -3,14 +3,17 @@
 
 #include "stdafx.h"
 #include "MiniPaint.h"
+#include <windows.h>
 #include <math.h>
 #include <cstdlib>
 #include <ctime>
+#include <tchar.h>
 #include "commdlg.h"
 #include "Initialization.h"
 #include "Shapes.h"
 
 
+enum Tools { PENCIL, LINE, RECTANGLE, ELLIPSE, POLY };
 #define MAX_LOADSTRING 100
 
 // Глобальные переменные:
@@ -24,10 +27,6 @@ BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
-void ChangePenWidth(HWND , UINT , WPARAM , LPARAM );
-void ChangePenColor(HWND, UINT, WPARAM, LPARAM);
-void DrawPen(HWND, UINT, WPARAM, LPARAM);
-void DrawLine(HWND, UINT, WPARAM, LPARAM);
 
 HDC hdc;
 HDC memoryHdc=0;
@@ -38,9 +37,14 @@ HPEN pen;
 HBRUSH brush;
 BOOL drawing=false;
 draw drawMode;
-Shape* shape;
+Shape* shape=NULL;
+Tools ToolId = PENCIL;
+POINT prevCoord;
 unsigned int penWidth = 1;
 COLORREF penColor = RGB(0, 0, 0);
+HFONT font = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+CHOOSECOLOR cc;
+COLORREF acrCustClr[16];
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -164,21 +168,34 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		{
 		case IDM_PENCOLOR:
 		{
-			CHOOSECOLOR color;
-			COLORREF ccref[16];
-			memset(&color, 0, sizeof(color));
-			color.lStructSize = sizeof(CHOOSECOLOR);
-			color.hwndOwner = NULL;
-			color.lpCustColors = ccref;
-			color.rgbResult = penColor;
-			color.Flags = CC_RGBINIT;
-			if (ChooseColor(&color))
-			{
-				penColor = color.rgbResult;
-			}
+							 ZeroMemory(&cc, sizeof(CHOOSECOLOR));
+							 cc.lStructSize = sizeof(CHOOSECOLOR);
+							 cc.hwndOwner = hWnd;
+							 cc.lpCustColors = (LPDWORD)acrCustClr;
+							 cc.Flags = CC_FULLOPEN | CC_RGBINIT;
+
+							 if (ChooseColor(&cc) == TRUE)
+							 {
+								 HPEN pen;
+								 Shape::penColor = cc.rgbResult;
+								 pen = CreatePen(Shape::penStyle, Shape::penWidth, Shape::penColor);
+								 DeleteObject(SelectObject(drawingHdc, pen));
+								 DeleteObject(SelectObject(memoryHdc, pen));
+							 }
+							 break;
 		}
 			break;
+		case IDM_PENCIL:
+			ToolId = PENCIL;
+			break;
 		case IDM_Line:
+			ToolId = LINE;
+			break;
+		case IDM_RECT:
+			ToolId = RECTANGLE;
+			break;
+		case IDM_ELLIPSE:
+			ToolId = ELLIPSE;
 			break;
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
@@ -192,44 +209,67 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_RBUTTONDOWN:
 	{
-		ChangePenColor( hWnd,  message,  wParam,  lParam);
 		break;
 	}
 	case WM_LBUTTONDOWN:
 	{
-						   drawing = TRUE;
-						   if (drawing)
+						   if (ToolId == PENCIL)
 						   {
-							   shape = new Line((short)LOWORD(lParam), (short)HIWORD(lParam));
-							 //  shape = new CustomRectangle((short)LOWORD(lParam), (short)HIWORD(lParam));
-							  // shape = new Pencil((short)LOWORD(lParam), (short)HIWORD(lParam));
+							   shape = new Pencil((short)LOWORD(lParam), (short)HIWORD(lParam));
 							   drawMode = BUFFER;
 						   }
 						   else
 						   {
-							   shape = new Line((short)LOWORD(lParam), (short)HIWORD(lParam));
-							//  shape = new CustomRectangle((short)LOWORD(lParam), (short)HIWORD(lParam));
-							   //shape = new CustomEllipse((short)LOWORD(lParam), (short)HIWORD(lParam));
+							   switch (ToolId)
+							   {
+							   case LINE:
+								   shape = new Line((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   break;
+
+							   case RECTANGLE:
+								   shape = new CustomRectangle((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   break;
+
+							   case ELLIPSE:
+								   shape = new CustomEllipse((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   break;
+							   }
 							   drawMode = CURRENT;
 						   }
 						   SetCapture(hWnd);
 	}
 	case WM_MOUSEMOVE:
 	{
+						 prevCoord.x = (short)LOWORD(lParam);
+						 prevCoord.y = (short)HIWORD(lParam);
+						 GetClientRect(hWnd, &rect);
+						 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
 						 if (wParam & MK_LBUTTON)
 						 {
-							 if (drawing)
+							 if (shape)
 							 {
-								 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
-								 drawMode = BUFFER;
+								 if (ToolId == PENCIL)
+								 {
+									 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+									 drawMode = BUFFER;
+								 }
+								 else
+								 {
+									 GetClientRect(hWnd, &rect);
+									 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+									 shape->draw(drawingHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+									 drawMode = CURRENT;
+								 }
 							 }
-							 else
-							 {
-								 GetClientRect(hWnd, &rect);
-								 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
-								 shape->draw(drawingHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
-								 drawMode = CURRENT;
-							 }
+						 }
+						 else
+						 {
+							 GetClientRect(hWnd, &rect);
+							 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+							 MoveToEx(drawingHdc, prevCoord.x, prevCoord.y, NULL);
+							 LineTo(drawingHdc, prevCoord.x, prevCoord.y);
+							 drawMode = CURRENT;
+							 InvalidateRect(hWnd, &rect, FALSE);
 						 }
 						 InvalidateRect(hWnd, NULL, FALSE);
 						 break;
@@ -237,15 +277,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_LBUTTONUP:
 	{
 						 ReleaseCapture();
-						 if (drawing)
+						 if ((ToolId != PENCIL) && shape != NULL)
 						 {
 							 GetClientRect(hWnd, &rect);
 							 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
 							 drawMode = BUFFER;
-							 drawing = false;
 							 InvalidateRect(hWnd, NULL, FALSE);
 						 }
 						 delete shape;
+						 shape = NULL;
 						 break;
 	}
 	case WM_PAINT:
@@ -266,7 +306,21 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_MOUSEWHEEL:
 	{
-		 break; 
+							  HPEN pen;
+							  Shape::penWidth += GET_WHEEL_DELTA_WPARAM(wParam) / 20;
+							  if (Shape::penWidth < 0)
+								  Shape::penWidth = 0;
+							  pen = CreatePen(Shape::penStyle, Shape::penWidth, Shape::penColor);
+							  DeleteObject(SelectObject(drawingHdc, pen));
+							  DeleteObject(SelectObject(memoryHdc, pen));
+							  GetClientRect(hWnd, &rect);
+							  BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+							  MoveToEx(drawingHdc, prevCoord.x, prevCoord.y, NULL);
+							  LineTo(drawingHdc, prevCoord.x, prevCoord.y);
+							  drawMode = CURRENT;
+							  InvalidateRect(hWnd, NULL, FALSE);
+						  
+						  break;
 	}
 	case WM_DESTROY:
 		ReleaseDC(hWnd, hdc);
@@ -277,41 +331,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	return 0;
 }
-
-void ChangePenColor(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	hdc = GetDC(hWnd);
-	DeleteObject(pen);
-	penColor = RGB(rand() % 256, rand() % 256, rand() % 256);
-	pen = CreatePen(PS_SOLID, penWidth, penColor);
-	ReleaseDC(hWnd, hdc);
-}
-void ChangePenWidth(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	hdc = GetDC(hWnd);
-	int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-	if (delta > 0)
-	{
-		if (wParam & MK_SHIFT)
-			penWidth = penWidth + 2;
-		else
-			penWidth++;
-	}
-	else
-	{
-		if (penWidth > 1)
-		{
-			if ((wParam & MK_SHIFT) & (penWidth>3))
-				penWidth = penWidth - 2;
-			else
-				penWidth--;
-		}
-	}
-	DeleteObject(pen);
-	pen = CreatePen(PS_SOLID, penWidth, penColor);
-	ReleaseDC(hWnd, hdc);
-}
-
 // Обработчик сообщений для окна "О программе".
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {

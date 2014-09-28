@@ -1,5 +1,9 @@
 #include "Shapes.h"
 
+int Shape::penWidth = 1;
+int Shape::penStyle = PS_SOLID;
+COLORREF Shape::penColor = RGB(0, 0, 0);
+
 // Shape
 Shape::Shape(int newX, int newY) : x(newX), y(newY){}
 
