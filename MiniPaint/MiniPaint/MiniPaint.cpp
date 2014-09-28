@@ -1,6 +1,3 @@
-// MiniPaint.cpp: определяет точку входа для приложения.
-//
-
 #include "stdafx.h"
 #include "MiniPaint.h"
 #include <windows.h>
@@ -13,15 +10,15 @@
 #include "Shapes.h"
 
 
-enum Tools { PENCIL, LINE, RECTANGLE, ELLIPSE, POLY };
+enum Tools { PENCIL, LINE, RECTANGLE, ELLIPSE, POLY,TEXT };
 #define MAX_LOADSTRING 100
 
-// Глобальные переменные:
-HINSTANCE hInst;								// текущий экземпляр
-TCHAR szTitle[MAX_LOADSTRING];					// Текст строки заголовка
-TCHAR szWindowClass[MAX_LOADSTRING];			// имя класса главного окна
 
-// Отправить объявления функций, включенных в этот модуль кода:
+HINSTANCE hInst;								
+TCHAR szTitle[MAX_LOADSTRING];					
+TCHAR szWindowClass[MAX_LOADSTRING];			
+
+
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -45,6 +42,8 @@ COLORREF penColor = RGB(0, 0, 0);
 HFONT font = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 CHOOSECOLOR cc;
 COLORREF acrCustClr[16];
+INT prevX = -1, prevY = -1, startX = -1, startY = -1; 
+BOOL isPolyLine; 
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -87,7 +86,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
+	wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
 	wcex.lpfnWndProc	= WndProc;
 	wcex.cbClsExtra		= 0;
 	wcex.cbWndExtra		= 0;
@@ -188,7 +187,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case IDM_PENCIL:
 			ToolId = PENCIL;
 			break;
-		case IDM_Line:
+		case IDM_LINE:
 			ToolId = LINE;
 			break;
 		case IDM_RECT:
@@ -196,6 +195,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case IDM_ELLIPSE:
 			ToolId = ELLIPSE;
+			break;
+		case IDM_POLYGON:
+			isPolyLine = FALSE;
+			prevX = -1;
+			prevY = -1;
+			ToolId = POLY;
+			break;
+		case IDM_POLYLINE:
+			isPolyLine = TRUE;
+			prevX = -1;
+			prevY = -1;
+			ToolId = POLY;
 			break;
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
@@ -232,6 +243,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 							   case ELLIPSE:
 								   shape = new CustomEllipse((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   break;
+							   case POLY:
+								   if (prevX == -1 && prevY == -1)
+								   {
+									   prevX = (short)LOWORD(lParam);
+									   prevY = (short)HIWORD(lParam);
+									   startX = prevX;
+									   startY = prevY;
+								   }
+								   shape = new Line(prevX, prevY);
 								   break;
 							   }
 							   drawMode = CURRENT;
@@ -279,6 +300,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						 ReleaseCapture();
 						 if ((ToolId != PENCIL) && shape != NULL)
 						 {
+							 if (prevX != -1 && prevY != -1)
+							 {
+								 prevX = (int)LOWORD(lParam);
+								 prevY = (int)HIWORD(lParam);
+							 }
 							 GetClientRect(hWnd, &rect);
 							 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
 							 drawMode = BUFFER;
@@ -288,6 +314,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						 shape = NULL;
 						 break;
 	}
+	case WM_LBUTTONDBLCLK:
+		if (ToolId == 4)
+		{
+			shape = new Line(prevX, prevY);
+			ReleaseCapture();
+			GetClientRect(hWnd, &rect);
+			if (!isPolyLine)
+				shape->draw(memoryHdc, startX, startY);
+			else
+				shape->draw(memoryHdc, prevX, prevY);
+			drawMode = BUFFER;
+			InvalidateRect(hWnd, NULL, FALSE);
+			prevX = -1;
+			prevY = -1;
+			startX = -1;
+			startY = -1;
+			delete shape;
+			shape = NULL;
+		}
+		break;
 	case WM_PAINT:
 		TempHdc = BeginPaint(hWnd, &ps);
 		GetClientRect(hWnd, &rect);
@@ -331,7 +377,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	return 0;
 }
-// Обработчик сообщений для окна "О программе".
+
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
