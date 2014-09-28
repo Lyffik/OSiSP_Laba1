@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Windows.h>
+#include "stdafx.h"
 
 class Shape abstract
 {
@@ -8,6 +8,9 @@ protected:
 	int x, y;
 
 public:
+	static int penWidth;
+	static COLORREF penColor;
+
 	Shape(int, int);
 	int getX();
 	int getY();

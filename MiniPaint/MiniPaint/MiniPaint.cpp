@@ -7,6 +7,9 @@
 #include <cstdlib>
 #include <ctime>
 #include "commdlg.h"
+#include "Initialization.h"
+#include "Shapes.h"
+
 
 #define MAX_LOADSTRING 100
 
@@ -27,14 +30,15 @@ void DrawPen(HWND, UINT, WPARAM, LPARAM);
 void DrawLine(HWND, UINT, WPARAM, LPARAM);
 
 HDC hdc;
-HDC memoryHdc;
-HDC drawingHdc;
+HDC memoryHdc=0;
+HDC drawingHdc=0;
 HBITMAP memoryBitmap;
 HBITMAP drawBitmap;
 HPEN pen;
 HBRUSH brush;
 BOOL drawing=false;
-
+draw drawMode;
+Shape* shape;
 unsigned int penWidth = 1;
 COLORREF penColor = RGB(0, 0, 0);
 
@@ -49,12 +53,10 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	MSG msg;
 	HACCEL hAccelTable;
 
-	// Инициализация глобальных строк
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadString(hInstance, IDC_MINIPAINT, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
 	srand((unsigned int)(time(NULL)));
-	// Выполнить инициализацию приложения:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
 		return FALSE;
@@ -62,7 +64,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 
 	hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_MINIPAINT));
 
-	// Цикл основного сообщения:
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
 		if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
@@ -76,12 +77,6 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 }
 
 
-
-//
-//  ФУНКЦИЯ: MyRegisterClass()
-//
-//  НАЗНАЧЕНИЕ: регистрирует класс окна.
-//
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
 	WNDCLASSEX wcex;
@@ -104,20 +99,11 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 }
 
 //
-//   ФУНКЦИЯ: InitInstance(HINSTANCE, int)
-//
-//   НАЗНАЧЕНИЕ: сохраняет обработку экземпляра и создает главное окно.
-//
-//   КОММЕНТАРИИ:
-//
-//        В данной функции дескриптор экземпляра сохраняется в глобальной переменной, а также
-//        создается и выводится на экран главное окно программы.
-//
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    HWND hWnd;
 
-   hInst = hInstance; // Сохранить дескриптор экземпляра в глобальной переменной
+   hInst = hInstance; 
 
    hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
@@ -133,51 +119,42 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-//
-//  ФУНКЦИЯ: WndProc(HWND, UINT, WPARAM, LPARAM)
-//
-//  НАЗНАЧЕНИЕ:  обрабатывает сообщения в главном окне.
-//
-//  WM_COMMAND	- обработка меню приложения
-//  WM_PAINT	-Закрасить главное окно
-//  WM_DESTROY	 - ввести сообщение о выходе и вернуться.
-//
-//
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
-	HDC TempHdc;
+	static HDC TempHdc;
+	RECT rect;
 	switch (message)
 	{
 	case WM_CREATE:
 	{
-		RECT rect;
-		hdc = GetDC(hWnd);
-		GetClientRect(hWnd, &rect);
-		
-		pen = (HPEN)GetStockObject(BLACK_PEN);
-		brush = (HBRUSH)GetStockObject(NULL_BRUSH);
+					  RECT rect;
 
-		memoryHdc = CreateCompatibleDC(hdc);
-		memoryBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+					  hdc = GetDC(hWnd);
+					  GetClientRect(hWnd, &rect);
 
-		drawingHdc = CreateCompatibleDC(hdc);
-		drawBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+					  pen = (HPEN)GetStockObject(BLACK_PEN);
+					  brush = (HBRUSH)GetStockObject(NULL_BRUSH);
 
-		DeleteObject(SelectObject(drawingHdc, drawBitmap));
-		DeleteObject(SelectObject(drawingHdc, (HBRUSH)WHITE_BRUSH));
-		PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
+					  memoryHdc = CreateCompatibleDC(hdc);
+					  memoryBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
 
-		DeleteObject(SelectObject(memoryHdc, memoryBitmap));
-		DeleteObject(SelectObject(memoryHdc, (HBRUSH)WHITE_BRUSH));
-		PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
+					  drawingHdc = CreateCompatibleDC(hdc);
+					  drawBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
 
-		DeleteObject(SelectObject(drawingHdc, pen));
-		DeleteObject(SelectObject(drawingHdc, brush));
-		DeleteObject(SelectObject(memoryHdc,pen));
-		DeleteObject(SelectObject(memoryHdc, brush));
+					  DeleteObject(SelectObject(drawingHdc, drawBitmap));
+					  DeleteObject(SelectObject(drawingHdc, (HBRUSH)WHITE_BRUSH));
+					  PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
 
+					  DeleteObject(SelectObject(memoryHdc, memoryBitmap));
+					  DeleteObject(SelectObject(memoryHdc, (HBRUSH)WHITE_BRUSH));
+					  PatBlt(memoryHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
+
+					  DeleteObject(SelectObject(drawingHdc, pen));
+					  DeleteObject(SelectObject(drawingHdc, brush));
+					  DeleteObject(SelectObject(memoryHdc, pen));
+					  DeleteObject(SelectObject(memoryHdc, brush));
 		break;
 	}
 	case WM_COMMAND:
@@ -213,10 +190,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			return DefWindowProc(hWnd, message, wParam, lParam);
 		}
 		break;
-	case WM_PAINT:
-		TempHdc = BeginPaint(hWnd, &ps);
-		EndPaint(hWnd, &ps);
-		break;
 	case WM_RBUTTONDOWN:
 	{
 		ChangePenColor( hWnd,  message,  wParam,  lParam);
@@ -224,94 +197,85 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	case WM_LBUTTONDOWN:
 	{
-						  
-						   break;
-	}
-	case WM_LBUTTONUP:
-	{
-						
-						   break;
+						   drawing = TRUE;
+						   if (drawing)
+						   {
+							   shape = new Line((short)LOWORD(lParam), (short)HIWORD(lParam));
+							 //  shape = new CustomRectangle((short)LOWORD(lParam), (short)HIWORD(lParam));
+							  // shape = new Pencil((short)LOWORD(lParam), (short)HIWORD(lParam));
+							   drawMode = BUFFER;
+						   }
+						   else
+						   {
+							   shape = new Line((short)LOWORD(lParam), (short)HIWORD(lParam));
+							//  shape = new CustomRectangle((short)LOWORD(lParam), (short)HIWORD(lParam));
+							   //shape = new CustomEllipse((short)LOWORD(lParam), (short)HIWORD(lParam));
+							   drawMode = CURRENT;
+						   }
+						   SetCapture(hWnd);
 	}
 	case WM_MOUSEMOVE:
 	{
-					
-		break;
+						 if (wParam & MK_LBUTTON)
+						 {
+							 if (drawing)
+							 {
+								 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+								 drawMode = BUFFER;
+							 }
+							 else
+							 {
+								 GetClientRect(hWnd, &rect);
+								 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+								 shape->draw(drawingHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+								 drawMode = CURRENT;
+							 }
+						 }
+						 InvalidateRect(hWnd, NULL, FALSE);
+						 break;
 	}
+	case WM_LBUTTONUP:
+	{
+						 ReleaseCapture();
+						 if (drawing)
+						 {
+							 GetClientRect(hWnd, &rect);
+							 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+							 drawMode = BUFFER;
+							 drawing = false;
+							 InvalidateRect(hWnd, NULL, FALSE);
+						 }
+						 delete shape;
+						 break;
+	}
+	case WM_PAINT:
+		TempHdc = BeginPaint(hWnd, &ps);
+		GetClientRect(hWnd, &rect);
+
+		switch (drawMode)
+		{
+			case CURRENT:
+				BitBlt(TempHdc, 0, 0, rect.right, rect.bottom, drawingHdc, 0, 0, SRCCOPY);
+				break;
+
+			case BUFFER:
+				BitBlt(TempHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+				break;
+		}
+		EndPaint(hWnd, &ps);
+		break;
 	case WM_MOUSEWHEEL:
 	{
 		 break; 
 	}
 	case WM_DESTROY:
+		ReleaseDC(hWnd, hdc);
 		PostQuitMessage(0);
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
-}
-
-void DrawLine(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	static int x1, x2, y1, y2;
-	switch (message)
-	{
-	case WM_LBUTTONDOWN:
-	{
-						   hdc = GetDC(hWnd);
-						   SelectObject(hdc, pen);
-						   x1 = x2 = LOWORD(lParam);
-						   y1 = y2 = HIWORD(lParam);
-						   MoveToEx(hdc, x1, y1, NULL);
-						   LineTo(hdc, x2, y2);
-						   break;
-	}
-	case WM_LBUTTONUP:
-	{
-						 hdc = GetDC(hWnd);
-						 SelectObject(hdc, pen);
-						 SetROP2(hdc, R2_COPYPEN);
-						 x2 = LOWORD(lParam);
-						 y2 = HIWORD(lParam);
-						 MoveToEx(hdc, x1, y1, NULL);
-						 LineTo(hdc, x2, y2);
-						 break;
-
-	}
-	case WM_MOUSEMOVE:
-	{ 
-		hdc = GetDC(hWnd);
-		SelectObject(hdc, pen);
-		if (wParam& MK_LBUTTON)
-		{
-			SetROP2(hdc, R2_NOTXORPEN);
-			MoveToEx(hdc, x1, y1, NULL);
-			LineTo(hdc, x2, y2);
-			x2 = LOWORD(lParam);
-			y2 = HIWORD(lParam);
-			MoveToEx(hdc, x1, y1, NULL);
-			LineTo(hdc, x2, y2);
-		}
-		break;
-	}
-	}
-	ReleaseDC(hWnd, hdc);
-}
-
-
-void DrawPen(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	hdc = GetDC(hWnd);
-	static int xold = 0, yold = 0;
-	int x = LOWORD(lParam);
-	int y = HIWORD(lParam);
-	if (wParam& MK_LBUTTON)
-	{
-		SelectObject(hdc, pen);
-		MoveToEx(hdc, xold, yold, NULL);
-		LineTo(hdc, x, y);
-		ReleaseDC(hWnd, hdc);
-	}
-	xold = x; yold = y;
 }
 
 void ChangePenColor(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
