@@ -125,6 +125,72 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
+
+void SaveMetaFile(HWND hWnd, HDC windowDC)
+{
+	TCHAR szFilters[] = _T("Metafile (*.emf)\0\0");
+	TCHAR szFilePathName[_MAX_PATH] = _T("");
+	OPENFILENAME ofn = { 0 };
+	ofn.lStructSize = sizeof(OPENFILENAME);
+	ofn.hwndOwner = hWnd;
+	ofn.lpstrFilter = szFilters;
+	ofn.lpstrFile = szFilePathName; // This will hold the file name
+	ofn.lpstrDefExt = _T("emf");
+	ofn.nMaxFile = _MAX_PATH;
+	ofn.lpstrTitle = _T("Save File");
+	ofn.Flags = OFN_OVERWRITEPROMPT;
+	ofn.lpstrInitialDir = _T("D:\\");
+	// Open the file save dialog, and choose the file name
+	GetSaveFileName(&ofn);
+
+	RECT rect;
+	HGDIOBJ hOldBrush;
+	HBRUSH hBrush;
+	HDC hDCMeta;
+	HENHMETAFILE hemf;
+
+	GetClientRect(hWnd, &rect);
+	hDCMeta = CreateEnhMetaFile(windowDC, ofn.lpstrFile, NULL, NULL);
+
+	hBrush = (HBRUSH)GetStockObject(HOLLOW_BRUSH);
+	hOldBrush = SelectObject(hDCMeta, hBrush);
+
+	BitBlt(hDCMeta, 0, 0, rect.right, rect.bottom, windowDC, 0, 0, SRCCOPY);
+
+	SelectObject(hDCMeta, hOldBrush);
+	hemf = CloseEnhMetaFile(hDCMeta);
+	DeleteEnhMetaFile(hemf);
+}
+
+void OpenMetaFile(HWND hWnd, HDC memDC, WPARAM wParam, LPARAM lParam)
+{
+
+	TCHAR szFilters[] = _T("Metafile (*.emf)\0\0");
+	TCHAR szFilePathName[_MAX_PATH] = _T("");
+	OPENFILENAME ofn = { 0 };
+	ofn.lStructSize = sizeof(OPENFILENAME);
+	ofn.hwndOwner = hWnd;
+	ofn.lpstrFilter = szFilters;
+	ofn.lpstrFile = szFilePathName; // This will hold the file name
+	ofn.lpstrDefExt = _T("emf");
+	ofn.nMaxFile = _MAX_PATH;
+	ofn.lpstrTitle = _T("Open File");
+	ofn.Flags = OFN_OVERWRITEPROMPT;
+	ofn.lpstrInitialDir = _T("D:\\");
+	// Open the file save dialog, and choose the file name
+	GetOpenFileName(&ofn);
+
+	RECT rect;
+	HENHMETAFILE hemf;
+
+	// open metafile
+	hemf = GetEnhMetaFile(ofn.lpstrFile);
+	GetClientRect(hWnd, &rect);
+	// Draw the picture. 
+	PlayEnhMetaFile(memDC, hemf, &rect);
+	PostMessage(hWnd, WM_PAINT, wParam, lParam);
+	DeleteEnhMetaFile(hemf);
+}
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
@@ -135,33 +201,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_CREATE:
 	{
-					  RECT rect;
-
 					  hdc = GetDC(hWnd);
-					  GetClientRect(hWnd, &rect);
-
-					  pen = (HPEN)GetStockObject(BLACK_PEN);
-					  brush = (HBRUSH)GetStockObject(NULL_BRUSH);
-
-					  memoryHdc = CreateCompatibleDC(hdc);
-					  memoryBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-
-					  drawingHdc = CreateCompatibleDC(hdc);
-					  drawBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
-
-					  DeleteObject(SelectObject(drawingHdc, drawBitmap));
-					  DeleteObject(SelectObject(drawingHdc, (HBRUSH)WHITE_BRUSH));
-					  PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
-
-					  DeleteObject(SelectObject(memoryHdc, memoryBitmap));
-					  DeleteObject(SelectObject(memoryHdc, (HBRUSH)WHITE_BRUSH));
-					  PatBlt(memoryHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
-
-					  DeleteObject(SelectObject(drawingHdc, pen));
-					  DeleteObject(SelectObject(drawingHdc, brush));
-					  DeleteObject(SelectObject(memoryHdc, pen));
-					  DeleteObject(SelectObject(memoryHdc, brush));
-		break;
+					  initializeDcs(hWnd, hdc, drawingHdc, drawBitmap, memoryHdc, memoryBitmap);
+					  break;
 	}
 	case WM_COMMAND:
 		wmId    = LOWORD(wParam);
@@ -213,6 +255,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_TEXT:
 			ToolId = TEXT;
+			break;
+		case ID_NEW:
+			hdc = GetDC(hWnd);
+			initializeDcs(hWnd, hdc, drawingHdc, drawBitmap, memoryHdc, memoryBitmap);
+			break;
+		case ID_OPEN:
+			OpenMetaFile(hWnd, memoryHdc, wParam, lParam);
+			break;
+		case ID_SAVE:
+			SaveMetaFile(hWnd, hdc);
 			break;
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);

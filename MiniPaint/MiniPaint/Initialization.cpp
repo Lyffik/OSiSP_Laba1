@@ -24,7 +24,7 @@ void initializeDcs(HWND &hWnd,HDC &hdc,HDC &drawingHdc,HBITMAP &drawBitmap,HDC &
 
 	DeleteObject(SelectObject(memoryHdc, memoryBitmap));
 	DeleteObject(SelectObject(memoryHdc, (HBRUSH)WHITE_BRUSH));
-	PatBlt(drawingHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
+	PatBlt(memoryHdc, 0, 0, rect.right, rect.bottom, PATCOPY);
 
 	DeleteObject(SelectObject(drawingHdc, pen));
 	DeleteObject(SelectObject(drawingHdc, brush));
