@@ -30,6 +30,8 @@ INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 HDC hdc;
 HDC memoryHdc=0;
 HDC drawingHdc=0;
+HDC printDc=0;
+HBITMAP printBitmap;
 HBITMAP memoryBitmap;
 HBITMAP drawBitmap;
 HPEN pen;
@@ -47,7 +49,11 @@ COLORREF acrCustClr[16];
 INT prevX = -1, prevY = -1, startX = -1, startY = -1; 
 BOOL isPolyLine; 
 String str;
-
+PRINTDLG pd;
+DOCINFO di;
+HANDLE       hOld;
+double scale;
+int xBegin = 0, yBegin = 0;
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -266,6 +272,53 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case ID_SAVE:
 			SaveMetaFile(hWnd, hdc);
 			break;
+		case ID_PRINT:
+			ZeroMemory(&pd, sizeof(pd));
+			pd.lStructSize = sizeof(pd);
+			pd.hwndOwner = hWnd;
+			pd.hDevMode = NULL; 
+			pd.hDevNames = NULL; 
+			pd.Flags = PD_USEDEVMODECOPIESANDCOLLATE | PD_RETURNDC;
+			pd.nCopies = 1;
+			pd.nFromPage = 0xFFFF;
+			pd.nToPage = 0xFFFF;
+			pd.nMinPage = 1;
+			pd.nMaxPage = 0xFFFF;
+
+
+			if (PrintDlg(&pd) == TRUE)
+			{
+				int Rx = GetDeviceCaps(pd.hDC, LOGPIXELSX);
+				int Ry = GetDeviceCaps(pd.hDC, LOGPIXELSY);
+				di.cbSize = sizeof(DOCINFO);
+				di.lpszDocName = (LPCWSTR)"Print Picture";
+				di.fwType = NULL;
+				di.lpszDatatype = NULL;
+				di.lpszOutput = NULL;
+				StartDoc(pd.hDC, &di);
+				StartPage(pd.hDC);
+				GetClientRect(hWnd, &rect);
+				printDc = CreateCompatibleDC(hdc);
+				printBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+				int Rx1 = GetDeviceCaps(printDc, LOGPIXELSX);
+				int Ry1 = GetDeviceCaps(printDc, LOGPIXELSY);
+				hOld = SelectObject(printDc, printBitmap);
+				FillRect(printDc, &rect, WHITE_BRUSH);
+				StretchBlt(printDc, 0, 0, (int)(rect.right*scale), (int)(rect.bottom*scale),
+					memoryHdc, xBegin, yBegin, rect.right, rect.bottom, SRCCOPY);
+				SelectObject(printDc, (HBRUSH)GetStockObject(NULL_BRUSH));
+				SelectObject(printDc, (HPEN)GetStockObject(BLACK_PEN));
+				Rectangle(printDc, 0, 0, (int)(rect.right*scale), (int)(rect.bottom*scale));
+				StretchBlt(pd.hDC, 0, 0, (int)((float)(0.91*rect.right*((float)(Rx / Rx1)))), (int)((float)(0.91*rect.bottom*((float)(Ry / Ry1)))),
+					memoryHdc, 0, 0, rect.right, rect.bottom, SRCCOPY);
+				SelectObject(printDc, hOld);
+				DeleteObject(printBitmap);
+				DeleteDC(printDc);
+				EndPage(pd.hDC);
+				EndDoc(pd.hDC);
+				DeleteDC(pd.hDC);
+			}
+				break;
 		case IDM_ABOUT:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
