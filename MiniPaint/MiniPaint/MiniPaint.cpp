@@ -52,8 +52,9 @@ String str;
 PRINTDLG pd;
 DOCINFO di;
 HANDLE       hOld;
-double scale;
+double scale=1;
 int xBegin = 0, yBegin = 0;
+
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPTSTR    lpCmdLine,
@@ -197,12 +198,13 @@ void OpenMetaFile(HWND hWnd, HDC memDC, WPARAM wParam, LPARAM lParam)
 	PostMessage(hWnd, WM_PAINT, wParam, lParam);
 	DeleteEnhMetaFile(hemf);
 }
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
 	PAINTSTRUCT ps;
 	static HDC TempHdc;
-	RECT rect;
+static	RECT rect;
 	switch (message)
 	{
 	case WM_CREATE:
@@ -297,6 +299,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				di.lpszOutput = NULL;
 				StartDoc(pd.hDC, &di);
 				StartPage(pd.hDC);
+				RECT rect;
 				GetClientRect(hWnd, &rect);
 				printDc = CreateCompatibleDC(hdc);
 				printBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
@@ -309,7 +312,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SelectObject(printDc, (HBRUSH)GetStockObject(NULL_BRUSH));
 				SelectObject(printDc, (HPEN)GetStockObject(BLACK_PEN));
 				Rectangle(printDc, 0, 0, (int)(rect.right*scale), (int)(rect.bottom*scale));
-				StretchBlt(pd.hDC, 0, 0, (int)((float)(0.91*rect.right*((float)(Rx / Rx1)))), (int)((float)(0.91*rect.bottom*((float)(Ry / Ry1)))),
+				StretchBlt(pd.hDC, 0, 0, (int)((float)(0.5*rect.right*((float)(Rx / Rx1)))), (int)((float)(0.5*rect.bottom*((float)(Ry / Ry1)))),
 					memoryHdc, 0, 0, rect.right, rect.bottom, SRCCOPY);
 				SelectObject(printDc, hOld);
 				DeleteObject(printBitmap);
@@ -468,6 +471,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_MOUSEWHEEL:
 	{
+						  if (GET_KEYSTATE_WPARAM(wParam) == MK_SHIFT)
+						  {
+							  if (GET_WHEEL_DELTA_WPARAM(wParam) < 0)
+							  {
+								  scale /= 1.25;
+							  }
+							  else
+							  {
+								  scale *= 1.25;
+							  }
+						  }
+						  else
+						  {
+
 							  HPEN pen;
 							  Shape::penWidth += GET_WHEEL_DELTA_WPARAM(wParam) / 20;
 							  if (Shape::penWidth < 0)
@@ -481,6 +498,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							  LineTo(drawingHdc, prevCoord.x, prevCoord.y);
 							  drawMode = CURRENT;
 							  InvalidateRect(hWnd, NULL, FALSE);
+						  }
 						  
 						  break;
 	}

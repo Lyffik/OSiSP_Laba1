@@ -7,7 +7,10 @@ void initializeDcs(HWND &hWnd,HDC &hdc,HDC &drawingHdc,HBITMAP &drawBitmap,HDC &
 	HPEN pen;
 
 	hdc = GetDC(hWnd);
-	GetClientRect(hWnd, &rect);
+	rect.top = 0;
+	rect.left = 0;
+	rect.right = 2500;
+	rect.bottom = 2500;
 
 	pen = (HPEN)GetStockObject(BLACK_PEN);
 	brush = (HBRUSH)GetStockObject(NULL_BRUSH);
