@@ -546,7 +546,7 @@ static	RECT rect;
 									  BitBlt(drawingHdc, tempRect.left, tempRect.top, tempRect.right, tempRect.bottom, memoryHdc, 0, 0, SRCCOPY);
 									  MoveToEx(drawingHdc, prevCoord.x, prevCoord.y, NULL);
 									  LineTo(drawingHdc, prevCoord.x, prevCoord.y);
-									  drawMode = CURRENT;
+									  drawMode = BUFFER;
 							 
 						}
 						  InvalidateRect(hWnd, NULL, FALSE);
