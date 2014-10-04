@@ -52,8 +52,11 @@ String str;
 PRINTDLG pd;
 DOCINFO di;
 HANDLE       hOld;
+BOOL pan=false;
 double scale=1;
 int xBegin = 0, yBegin = 0;
+int offsetX=0;
+int offsetY=0;
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -211,6 +214,10 @@ static	RECT rect;
 	{
 					  hdc = GetDC(hWnd);
 					  initializeDcs(hWnd, hdc, drawingHdc, drawBitmap, memoryHdc, memoryBitmap);
+					  rect.top = 0;
+					  rect.left = 0;
+					  rect.right = 2500;
+					  rect.bottom = 2500;
 					  break;
 	}
 	case WM_COMMAND:
@@ -267,6 +274,13 @@ static	RECT rect;
 		case ID_NEW:
 			hdc = GetDC(hWnd);
 			initializeDcs(hWnd, hdc, drawingHdc, drawBitmap, memoryHdc, memoryBitmap);
+			offsetX = 0;
+			offsetY = 0;
+			scale = 1;
+			rect.top = 0;
+			rect.left = 0;
+			rect.right = 2500;
+			rect.bottom = 2500;
 			break;
 		case ID_OPEN:
 			OpenMetaFile(hWnd, memoryHdc, wParam, lParam);
@@ -338,9 +352,11 @@ static	RECT rect;
 	}
 	case WM_LBUTTONDOWN:
 	{
+						   int x = (short)LOWORD(lParam)*scale+offsetX;
+						   int y = (short)HIWORD(lParam)*scale + offsetY;
 						   if (ToolId == PENCIL)
 						   {
-							   shape = new Pencil((short)LOWORD(lParam), (short)HIWORD(lParam));
+							   shape = new Pencil(x, y);
 							   drawMode = BUFFER;
 						   }
 						   else
@@ -348,29 +364,29 @@ static	RECT rect;
 							   switch (ToolId)
 							   {
 							   case LINE:
-								   shape = new Line((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   shape = new Line(x, y);
 								   break;
 
 							   case RECTANGLE:
-								   shape = new CustomRectangle((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   shape = new CustomRectangle(x, y);
 								   break;
 
 							   case ELLIPSE:
-								   shape = new CustomEllipse((short)LOWORD(lParam), (short)HIWORD(lParam));
+								   shape = new CustomEllipse(x, y);
 								   break;
 							   case POLY:
 								   if (prevX == -1 && prevY == -1)
 								   {
-									   prevX = (short)LOWORD(lParam);
-									   prevY = (short)HIWORD(lParam);
+									   prevX = x;
+									   prevY = y;
 									   startX = prevX;
 									   startY = prevY;
 								   }
 								   shape = new Line(prevX, prevY);
 								   break;
 							   case TEXT:
-								   prevX = (short)LOWORD(lParam);
-								   prevY = (short)HIWORD(lParam);
+								   prevX = x;
+								   prevY = y;
 								   str.clear();
 								   break;
 							   }
@@ -380,36 +396,41 @@ static	RECT rect;
 	}
 	case WM_MOUSEMOVE:
 	{
-						 prevCoord.x = (short)LOWORD(lParam);
-						 prevCoord.y = (short)HIWORD(lParam);
-						 GetClientRect(hWnd, &rect);
-						 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+						 int x = (short)LOWORD(lParam)*scale + offsetX;
+						 int y = (short)HIWORD(lParam)*scale + offsetY;
+						 prevCoord.x = x;
+						 prevCoord.y = y;
+						 RECT tempRect;
+						 GetClientRect(hWnd, &tempRect);
+						 tempRect.left = offsetX;
+						 tempRect.top = offsetY;
+						 tempRect.right *= scale;
+						 tempRect.bottom *= scale;
+						 BitBlt(drawingHdc, 0, 0, tempRect.right, tempRect.bottom, memoryHdc, 0, 0, SRCCOPY);
 						 if (wParam & MK_LBUTTON)
 						 {
 							 if (shape)
 							 {
 								 if (ToolId == PENCIL)
 								 {
-									 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+									 shape->draw(memoryHdc,x, y);
 									 drawMode = BUFFER;
 								 }
 								 else
 								 {
-									 GetClientRect(hWnd, &rect);
-									 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
-									 shape->draw(drawingHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+									 BitBlt(drawingHdc, 0, 0, tempRect.right, tempRect.bottom, memoryHdc, 0, 0, SRCCOPY);
+									 shape->draw(drawingHdc, x, y);
 									 drawMode = CURRENT;
 								 }
 							 }
 						 }
 						 else
 						 {
-							 GetClientRect(hWnd, &rect);
-							 BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+							 BitBlt(drawingHdc, 0, 0, tempRect.right, tempRect.bottom, memoryHdc, 0, 0, SRCCOPY);
 							 MoveToEx(drawingHdc, prevCoord.x, prevCoord.y, NULL);
 							 LineTo(drawingHdc, prevCoord.x, prevCoord.y);
-							 drawMode = CURRENT;
-							 InvalidateRect(hWnd, &rect, FALSE);
+							 drawMode = BUFFER;
+							 InvalidateRect(hWnd, NULL, FALSE);
 						 }
 						 InvalidateRect(hWnd, NULL, FALSE);
 						 break;
@@ -417,15 +438,17 @@ static	RECT rect;
 	case WM_LBUTTONUP:
 	{
 						 ReleaseCapture();
+						 int x = (short)LOWORD(lParam)*scale + offsetX;
+						 int y = (short)HIWORD(lParam)*scale + offsetY;
 						 if ((ToolId != PENCIL) && shape != NULL)
 						 {
 							 if (prevX != -1 && prevY != -1)
 							 {
-								 prevX = (int)LOWORD(lParam);
-								 prevY = (int)HIWORD(lParam);
+								 prevX = x;
+								 prevY = y;
 							 }
 							 GetClientRect(hWnd, &rect);
-							 shape->draw(memoryHdc, (short)LOWORD(lParam), (short)HIWORD(lParam));
+							 shape->draw(memoryHdc, x, y);
 							 drawMode = BUFFER;
 							 InvalidateRect(hWnd, NULL, FALSE);
 						 }
@@ -436,6 +459,8 @@ static	RECT rect;
 	case WM_LBUTTONDBLCLK:
 		if (ToolId == 4)
 		{
+			int x = (short)LOWORD(lParam)*scale + offsetX;
+			int y = (short)HIWORD(lParam)*scale + offsetY;
 			shape = new Line(prevX, prevY);
 			ReleaseCapture();
 			GetClientRect(hWnd, &rect);
@@ -455,53 +480,82 @@ static	RECT rect;
 		break;
 	case WM_PAINT:
 		TempHdc = BeginPaint(hWnd, &ps);
-		GetClientRect(hWnd, &rect);
-
+		RECT tempRect;
+		GetClientRect(hWnd, &tempRect);
+		tempRect.left = offsetX;
+		tempRect.top = offsetY;
+		tempRect.right *= scale;
+		tempRect.bottom *= scale;
 		switch (drawMode)
 		{
 			case CURRENT:
-				BitBlt(TempHdc, 0, 0, rect.right, rect.bottom, drawingHdc, 0, 0, SRCCOPY);
+
+					StretchBlt(hdc, 0, 0, rect.right, rect.bottom, drawingHdc, tempRect.left, tempRect.top, tempRect.right, tempRect.bottom, SRCCOPY);
 				break;
 
 			case BUFFER:
-				BitBlt(TempHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
+			
+				StretchBlt(hdc, 0, 0, rect.right, rect.bottom, memoryHdc,tempRect.left, tempRect.top, tempRect.right, tempRect.bottom, SRCCOPY);
 				break;
 		}
 		EndPaint(hWnd, &ps);
 		break;
+
 	case WM_MOUSEWHEEL:
 	{
-						  if (GET_KEYSTATE_WPARAM(wParam) == MK_SHIFT)
+						  GetClientRect(hWnd, &rect);
+						  FillRect(hdc, &rect, WHITE_BRUSH);
+						  if (GET_KEYSTATE_WPARAM(wParam) == MK_CONTROL)
 						  {
-							  if (GET_WHEEL_DELTA_WPARAM(wParam) < 0)
-							  {
-								  scale /= 1.25;
-							  }
-							  else
-							  {
-								  scale *= 1.25;
-							  }
-						  }
-						  else
-						  {
+							  drawMode = BUFFER;
+							  offsetX += GET_WHEEL_DELTA_WPARAM(wParam);
 
-							  HPEN pen;
-							  Shape::penWidth += GET_WHEEL_DELTA_WPARAM(wParam) / 20;
-							  if (Shape::penWidth < 0)
-								  Shape::penWidth = 0;
-							  pen = CreatePen(Shape::penStyle, Shape::penWidth, Shape::penColor);
-							  DeleteObject(SelectObject(drawingHdc, pen));
-							  DeleteObject(SelectObject(memoryHdc, pen));
-							  GetClientRect(hWnd, &rect);
-							  BitBlt(drawingHdc, 0, 0, rect.right, rect.bottom, memoryHdc, 0, 0, SRCCOPY);
-							  MoveToEx(drawingHdc, prevCoord.x, prevCoord.y, NULL);
-							  LineTo(drawingHdc, prevCoord.x, prevCoord.y);
-							  drawMode = CURRENT;
-							  InvalidateRect(hWnd, NULL, FALSE);
 						  }
-						  
+						  else if (GET_KEYSTATE_WPARAM(wParam) == MK_SHIFT)
+							{
+								  if (GET_WHEEL_DELTA_WPARAM(wParam) < 0)
+								  {
+									  scale /= 1.25;
+								  }
+								  else
+								  {
+									  scale *= 1.25;
+								  }
+							  }
+							else if (GET_KEYSTATE_WPARAM(wParam) == (MK_SHIFT | MK_CONTROL))
+								  {
+										drawMode = BUFFER;
+									  offsetY += GET_WHEEL_DELTA_WPARAM(wParam);
+								  }
+							else
+							{
+
+									  HPEN pen;
+									  Shape::penWidth += GET_WHEEL_DELTA_WPARAM(wParam) / 20;
+									  if (Shape::penWidth < 0)
+										  Shape::penWidth = 0;
+									  pen = CreatePen(Shape::penStyle, Shape::penWidth, Shape::penColor);
+									  DeleteObject(SelectObject(drawingHdc, pen));
+									  DeleteObject(SelectObject(memoryHdc, pen));
+									  RECT tempRect;
+									  GetClientRect(hWnd, &tempRect);
+									  tempRect.left = offsetX;
+									  tempRect.top = offsetY;
+									  tempRect.right *= scale;
+									  tempRect.bottom *= scale;
+									  BitBlt(drawingHdc, tempRect.left, tempRect.top, tempRect.right, tempRect.bottom, memoryHdc, 0, 0, SRCCOPY);
+									  MoveToEx(drawingHdc, prevCoord.x, prevCoord.y, NULL);
+									  LineTo(drawingHdc, prevCoord.x, prevCoord.y);
+									  drawMode = CURRENT;
+							 
+						}
+						  InvalidateRect(hWnd, NULL, FALSE);
 						  break;
 	}
+	case	WM_ERASEBKGND:
+		GetClientRect(hWnd, &rect);
+		FillRect(hdc, &rect, WHITE_BRUSH);
+		break;
 	case WM_CHAR:
 		if (ToolId == 5)
 		{
@@ -513,10 +567,15 @@ static	RECT rect;
 			InvalidateRect(hWnd, NULL, FALSE);
 		}
 		break;
+	case WM_MOVE:
+		InvalidateRect(hWnd, NULL, true);
+		UpdateWindow(hWnd);
+		break;
 	case WM_DESTROY:
 		ReleaseDC(hWnd, hdc);
 		PostQuitMessage(0);
 		break;
+
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}

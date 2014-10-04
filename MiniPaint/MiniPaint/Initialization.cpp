@@ -10,7 +10,7 @@ void initializeDcs(HWND &hWnd,HDC &hdc,HDC &drawingHdc,HBITMAP &drawBitmap,HDC &
 	rect.top = 0;
 	rect.left = 0;
 	rect.right = 2500;
-	rect.bottom = 2500;
+	rect.bottom = 2000;
 
 	pen = (HPEN)GetStockObject(BLACK_PEN);
 	brush = (HBRUSH)GetStockObject(NULL_BRUSH);
