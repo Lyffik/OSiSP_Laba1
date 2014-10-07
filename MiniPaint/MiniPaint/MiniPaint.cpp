@@ -272,15 +272,43 @@ static	RECT rect;
 			ToolId = TEXT;
 			break;
 		case ID_NEW:
+			
 			hdc = GetDC(hWnd);
-			initializeDcs(hWnd, hdc, drawingHdc, drawBitmap, memoryHdc, memoryBitmap);
+			memoryHdc = 0;
+			drawingHdc = 0;
+			DeleteObject(SelectObject(drawingHdc, pen));
+			DeleteObject(SelectObject(drawingHdc, brush));
+			DeleteObject(SelectObject(memoryHdc, pen));
+			DeleteObject(SelectObject(memoryHdc, brush));
+			prevX = -1;
+			prevY = -1;
+			startX = -1;
+			startY = -1;
 			offsetX = 0;
 			offsetY = 0;
+			xBegin = 0;
+			yBegin = 0;
 			scale = 1;
-			rect.top = 0;
-			rect.left = 0;
-			rect.right = 2500;
-			rect.bottom = 2500;
+			initializeDcs(hWnd, hdc, drawingHdc, drawBitmap, memoryHdc, memoryBitmap);
+			GetClientRect(hWnd, &rect);
+			FillRect(hdc, &rect, WHITE_BRUSH);
+			HPEN pen;
+			Shape::penWidth += GET_WHEEL_DELTA_WPARAM(wParam) / 20;
+			if (Shape::penWidth < 0)
+				Shape::penWidth = 0;
+			pen = CreatePen(Shape::penStyle, Shape::penWidth, Shape::penColor);
+			DeleteObject(SelectObject(drawingHdc, pen));
+			DeleteObject(SelectObject(memoryHdc, pen));
+			RECT tempRect;
+			GetClientRect(hWnd, &tempRect);
+			tempRect.left = offsetX;
+			tempRect.top = offsetY;
+			tempRect.right *= scale;
+			tempRect.bottom *= scale;
+			BitBlt(drawingHdc, tempRect.left, tempRect.top, tempRect.right, tempRect.bottom, memoryHdc, 0, 0, SRCCOPY);
+			drawMode = BUFFER;
+		InvalidateRect(hWnd, NULL, FALSE);
+			
 			break;
 		case ID_OPEN:
 			OpenMetaFile(hWnd, memoryHdc, wParam, lParam);
